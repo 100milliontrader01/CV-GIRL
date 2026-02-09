@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern CV Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Fonts: Inter for Body, Playfair Display for Headings -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0f172a; /* Slate 900 */
+            --accent: #4f46e5; /* Indigo 600 */
+            --text-light: #64748b; /* Slate 500 */
+            --bg-page: #ffffff;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #e2e8f0;
+            color: var(--primary);
+        }
+
+        /* --- A4 Page Setup --- */
+        .a4-page {
+            width: 210mm;
+            min-height: 297mm; /* A4 Height */
+            background: var(--bg-page);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            margin: 0 auto;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            padding: 0; /* Control padding via children */
+            color: #334155;
+            /* Ensure background colors print */
+            -webkit-print-color-adjust: exact; 
+            print-color-adjust: exact;
+        }
+
+        /* Print Overlay Adjustments */
+        @media print {
+            body * { visibility: hidden; }
+            #cv-preview, #cv-preview * { visibility: visible; }
+            #cv-preview {
+                position: absolute;
+                left: 0; top: 0;
+                width: 100%;
+                margin: 0;
+                box-shadow: none;
+            }
+            /* Hide UI elements */
+            nav, #input-section, #loader { display: none !important; }
+        }
+
+        /* --- CV Header Design --- */
+        .cv-header {
+            padding: 3.5rem 3rem 2rem 3rem; /* Top padding for breathing room */
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .cv-name {
+            font-family: 'Playfair Display', serif;
+            font-size: 3rem;
+            font-weight: 700;
+            line-height: 1;
+            color: #0f172a;
+            letter-spacing: -0.02em;
+            margin-bottom: 0.5rem;
+        }
+
+        .cv-title {
+            font-family: 'Inter', sans-serif;
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--accent);
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+        }
+
+        .cv-contact {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            font-size: 0.85rem;
+            color: var(--text-light);
+            font-weight: 400;
+        }
+
+        .cv-contact span {
+            display: flex;
+            align-items: center;
+        }
+        
+        /* Pipe separator logic */
+        .cv-contact span:not(:last-child)::after {
+            content: "";
+            display: inline-block;
+            width: 4px;
+            height: 4px;
+            background-color: #cbd5e1;
+            border-radius: 50%;
+            margin-left: 1rem;
+        }
+
+        /* --- CV Body Layout (Grid) --- */
+        .cv-body {
+            display: grid;
+            grid-template-columns: 2fr 1fr; /* 2/3 Main, 1/3 Sidebar */
+            min-height: 500px; /* arbitrary min height */
+        }
+
+        .cv-main {
+            padding: 2.5rem 3rem;
+            border-right: 1px solid #f1f5f9;
+        }
+
+        .cv-sidebar {
+            padding: 2.5rem 2rem;
+            background-color: #fafafa; /* Subtle grey background for sidebar */
+        }
+
+        /* --- Section Styling --- */
+        .section-wrapper {
+            margin-bottom: 2.5rem;
+        }
+        
+        .section-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .section-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #1e293b;
+            white-space: nowrap;
+            margin-right: 1rem;
+        }
+
+        .section-line {
+            height: 1px;
+            background-color: #e2e8f0;
+            flex-grow: 1;
+        }
+
+        /* --- Job / Education Items --- */
+        .job-item, .edu-item, .project-item {
+            margin-bottom: 1.75rem;
+            page-break-inside: avoid;
+        }
+
+        .job-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 0.25rem;
+        }
+
+        .job-role {
+            font-weight: 700;
+            font-size: 1.05rem;
+            color: #334155;
+        }
+
+        .job-date {
+            font-size: 0.85rem;
+            color: var(--text-light);
+            font-variant-numeric: tabular-nums;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .job-company {
+            font-size: 0.95rem;
+            color: var(--accent);
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        .job-desc ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .job-desc li {
+            position: relative;
+            padding-left: 1rem;
+            margin-bottom: 0.35rem;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: #475569;
+        }
+
+        .job-desc li::before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: #94a3b8;
+        }
+
+        /* --- Sidebar Items --- */
+        .sidebar-section {
+            margin-bottom: 2.5rem;
+        }
+
+        .sidebar-title {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--text-light);
+            font-weight: 700;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 0.5rem;
+            display: inline-block;
+        }
+
+        /* Skill Pills */
+        .skill-tag {
+            display: inline-block;
+            padding: 0.35rem 0.75rem;
+            background-color: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 9999px; /* Pill shape */
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: #475569;
+            margin-bottom: 0.5rem;
+            margin-right: 0.25rem;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .sidebar-list-item {
+            font-size: 0.9rem;
+            color: #475569;
+            margin-bottom: 0.5rem;
+            line-height: 1.5;
+        }
+
+        /* --- UI Elements --- */
+        #loader { display: none; }
+        
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+            transition: all 0.2s;
+        }
+        .btn-primary:hover { background-color: #1e293b; transform: translateY(-1px); }
+        
+        textarea {
+            resize: none; 
+            font-family: 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', "Liberation Mono", "Courier New", monospace;
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden">
+
+    <!-- Navbar -->
+    <nav class="bg-white border-b border-gray-200 h-16 shrink-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 h-full flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-white font-bold font-serif">Cv</div>
+                <span class="text-lg font-semibold text-slate-800 tracking-tight">ModernBuilder</span>
+            </div>
+            <div class="flex items-center space-x-3">
+                <button id="btn-edit" class="hidden text-slate-600 hover:text-slate-900 px-4 py-2 text-sm font-medium transition-colors">
+                    ← Edit Information
+                </button>
+                <button id="btn-generate" class="btn-primary px-6 py-2.5 rounded-lg text-sm font-medium shadow-sm">
+                    Generate Resume
+                </button>
+                <button id="btn-download" class="hidden bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium shadow-sm transition-all flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    Download PDF
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Content Wrapper -->
+    <div class="flex-1 flex overflow-hidden relative">
+        
+        <!-- Input Section -->
+        <section id="input-section" class="w-full max-w-5xl mx-auto p-6 overflow-y-auto">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+                <div class="flex justify-between items-start mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-900 mb-2 font-serif">Resume Details</h2>
+                        <p class="text-slate-500 text-sm">Paste your resume content below. Our parser organizes it into a professional layout.</p>
+                    </div>
+                    <div class="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-lg text-xs font-medium">
+                        Tips: Use "EXPERIENCE", "EDUCATION" as headers
+                    </div>
+                </div>
+
+                <div class="h-[60vh] border border-gray-200 rounded-lg focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent transition-all">
+                    <textarea id="raw-input" class="w-full h-full p-6 text-sm text-slate-700 leading-relaxed outline-none rounded-lg" placeholder="Paste your CV content here..."></textarea>
+                </div>
+            </div>
+        </section>
+
+        <!-- Preview Section -->
+        <section id="preview-section" class="hidden w-full bg-slate-200 overflow-y-auto py-10 px-4 flex justify-center">
+            
+            <!-- The A4 Page -->
+            <div id="cv-preview" class="a4-page">
+                
+                <!-- Header -->
+                <div class="cv-header">
+                    <h1 id="p-name" class="cv-name">Your Name</h1>
+                    <div id="p-title" class="cv-title">Professional Title</div>
+                    <div id="p-contact" class="cv-contact">
+                        <!-- Contact injected here -->
+                    </div>
+                </div>
+
+                <div class="cv-body">
+                    <!-- Left Main Column (Experience, Projects) -->
+                    <div class="cv-main">
+                        <div id="p-summary-section" class="section-wrapper hidden">
+                            <div class="section-header">
+                                <h3 class="section-title">Profile</h3>
+                                <div class="section-line"></div>
+                            </div>
+                            <p id="p-summary" class="text-sm text-slate-600 leading-relaxed"></p>
+                        </div>
+
+                        <div id="p-experience-section" class="section-wrapper">
+                            <div class="section-header">
+                                <h3 class="section-title">Experience</h3>
+                                <div class="section-line"></div>
+                            </div>
+                            <div id="p-experience-list"></div>
+                        </div>
+                        
+                        <div id="p-projects-section" class="section-wrapper">
+                            <div class="section-header">
+                                <h3 class="section-title">Projects</h3>
+                                <div class="section-line"></div>
+                            </div>
+                            <div id="p-projects-list"></div>
+                        </div>
+                    </div>
+
+                    <!-- Right Sidebar (Skills, Education, Awards) -->
+                    <div class="cv-sidebar">
+                        
+                        <!-- Skills moved to Sidebar for Modern Look -->
+                        <div id="p-skills-section" class="sidebar-section">
+                            <h3 class="sidebar-title">Skills</h3>
+                            <div id="p-skills-list" class="flex flex-wrap"></div>
+                        </div>
+
+                        <!-- Education moved to sidebar usually, or keep in main? Let's keep Education in Sidebar for "Swiss" look or Main? 
+                             Let's actually put Education in Sidebar if it fits, usually better for space. 
+                             But parsing logic puts it in Main lists. I will create a container in Sidebar for Edu if needed, 
+                             but let's stick to the DOM structure we have in JS but style them differently. 
+                             
+                             WAIT: The JS below maps data.education to p-education-list. 
+                             I will move p-education-section div into the Sidebar area in HTML below.
+                        -->
+                        <div id="p-education-section" class="sidebar-section">
+                            <h3 class="sidebar-title">Education</h3>
+                            <div id="p-education-list" class="text-sm"></div>
+                        </div>
+
+                        <div id="p-awards-section" class="sidebar-section">
+                            <h3 class="sidebar-title">Awards</h3>
+                            <div id="p-awards-list"></div>
+                        </div>
+
+                        <div id="p-languages-section" class="sidebar-section">
+                            <h3 class="sidebar-title">Languages</h3>
+                            <div id="p-languages-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+    
+    <!-- Loading Overlay -->
+    <div id="loader" class="fixed inset-0 bg-slate-900 bg-opacity-75 z-[60] flex items-center justify-center backdrop-blur-sm">
+        <div class="bg-white p-6 rounded-xl shadow-2xl flex flex-col items-center space-y-4">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+            <span class="text-sm font-semibold text-slate-700">Preparing PDF...</span>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. Default Template Data ---
+        const DEFAULT_TEMPLATE = `JAMES ANDERSON
+Product Designer
+james.anderson@example.com | +1 (555) 019-2834 | New York, NY | portfolio.com/james
+
+SUMMARY
+Multi-disciplinary product designer with 6+ years of experience in UI/UX, user research, and design systems. Passionate about creating intuitive digital experiences that solve complex user problems.
+
+EXPERIENCE
+Senior Product Designer
+TechFlow Inc.
+2021 - Present
+- Spearheaded the redesign of the core SaaS platform, increasing user retention by 25%.
+- Established and maintained the "Flow" design system used by 30+ designers and engineers.
+- Facilitated user research sessions and synthesized data to drive product strategy.
+
+UI/UX Designer
+Creative Pulse Agency
+2018 - 2021
+- Designed mobile-first interfaces for fintech and healthcare clients.
+- Collaborated closely with frontend developers to ensure design fidelity.
+- Won the "Best App Design" award for the HealthTrack mobile application.
+
+Junior Designer
+Studio Graphix
+2016 - 2018
+- Assisted in the creation of branding materials and marketing websites.
+
+EDUCATION
+Master of Design (Interaction Design)
+Parsons School of Design
+2016
+
+Bachelor of Arts in Graphic Design
+University of California, Los Angeles
+2014
+
+SKILLS
+Figma, Sketch, Adobe CC, Prototyping, HTML/CSS, User Research, Agile, Design Systems, Wireframing
+
+PROJECTS
+EcoTrack Mobile App
+- Designed a gamified sustainability app that reached 100k downloads in first month.
+- Conducted A/B testing on onboarding flows to optimize conversion.
+
+FinDash Dashboard
+- Created a comprehensive financial dashboard for enterprise clients.
+
+AWARDS
+Red Dot Design Award 2022
+Awwwards Site of the Day 2020
+
+LANGUAGES
+English (Native)
+French (Fluent)
+`;
+
+        // --- 2. Element Selectors ---
+        const els = {
+            inputSection: document.getElementById('input-section'),
+            previewSection: document.getElementById('preview-section'),
+            rawInput: document.getElementById('raw-input'),
+            btnGenerate: document.getElementById('btn-generate'),
+            btnEdit: document.getElementById('btn-edit'),
+            btnDownload: document.getElementById('btn-download'),
+            loader: document.getElementById('loader'),
+            // Preview Elements
+            pName: document.getElementById('p-name'),
+            pTitle: document.getElementById('p-title'),
+            pContact: document.getElementById('p-contact'),
+            pSummary: document.getElementById('p-summary'),
+            pSummarySec: document.getElementById('p-summary-section'),
+            pExpList: document.getElementById('p-experience-list'),
+            pEduList: document.getElementById('p-education-list'), // Now in sidebar
+            pProjList: document.getElementById('p-projects-list'),
+            pSkillsList: document.getElementById('p-skills-list'),
+            pAwardsList: document.getElementById('p-awards-list'),
+            pLangList: document.getElementById('p-languages-list'),
+            // Sections
+            secExp: document.getElementById('p-experience-section'),
+            secEdu: document.getElementById('p-education-section'),
+            secProj: document.getElementById('p-projects-section'),
+            secSkills: document.getElementById('p-skills-section'),
+            secAwards: document.getElementById('p-awards-section'),
+            secLang: document.getElementById('p-languages-section'),
+        };
+
+        // --- 3. Initialization ---
+        els.rawInput.value = DEFAULT_TEMPLATE;
+
+        // --- 4. Logic: Parser ---
+        function parseText(text) {
+            const sections = {
+                header: [],
+                summary: [],
+                experience: [],
+                education: [],
+                skills: [],
+                projects: [],
+                awards: [],
+                languages: []
+            };
+
+            let currentSection = 'header';
+            const lines = text.split('\n');
+
+            const keywords = {
+                'SUMMARY': 'summary', 'PROFILE': 'summary', 'ABOUT': 'summary',
+                'EXPERIENCE': 'experience', 'WORK HISTORY': 'experience', 'EMPLOYMENT': 'experience',
+                'EDUCATION': 'education',
+                'SKILLS': 'skills', 'TECHNICAL SKILLS': 'skills', 'CORE COMPETENCIES': 'skills',
+                'PROJECTS': 'projects',
+                'AWARDS': 'awards', 'HONORS': 'awards', 'CERTIFICATIONS': 'awards',
+                'LANGUAGES': 'languages',
+                'CONTACT': 'header'
+            };
+
+            lines.forEach(line => {
+                const trimmed = line.trim();
+                if (!trimmed) return;
+                const upper = trimmed.toUpperCase();
+                if (keywords[upper]) {
+                    currentSection = keywords[upper];
+                    return;
+                }
+                sections[currentSection].push(trimmed);
+            });
+            return sections;
+        }
+
+        // --- 5. Logic: Renderer ---
+        function renderCV(data) {
+            // Header
+            if (data.header.length > 0) {
+                els.pName.textContent = data.header[0];
+                els.pTitle.textContent = data.header[1] || '';
+                
+                els.pContact.innerHTML = '';
+                const contactLines = data.header.slice(2);
+                const contactStr = contactLines.join(' | ');
+                const contacts = contactStr.split(/[|•]/).map(s => s.trim()).filter(s => s);
+                
+                contacts.forEach(c => {
+                    const span = document.createElement('span');
+                    span.textContent = c;
+                    els.pContact.appendChild(span);
+                });
+            }
+
+            // Summary
+            if (data.summary.length > 0) {
+                els.pSummarySec.classList.remove('hidden');
+                els.pSummary.textContent = data.summary.join(' ');
+            } else {
+                els.pSummarySec.classList.add('hidden');
+            }
+
+            // --- Main Content Renderers (Experience, Projects) ---
+            function renderMainList(items, container, sectionEl) {
+                container.innerHTML = '';
+                if (!items || items.length === 0) {
+                    sectionEl.classList.add('hidden');
+                    return;
+                }
+                sectionEl.classList.remove('hidden');
+
+                let jobBlocks = [];
+                let currentBlock = null;
+
+                items.forEach((line) => {
+                    const isBullet = line.startsWith('-') || line.startsWith('•') || line.startsWith('*');
+                    
+                    if (!currentBlock) {
+                        currentBlock = { title: line, subtitle: '', meta: '', desc: [] };
+                    } else if (isBullet) {
+                        currentBlock.desc.push(line.replace(/^[-•*]\s*/, ''));
+                    } else {
+                        if (currentBlock.desc.length > 0) {
+                            jobBlocks.push(currentBlock);
+                            currentBlock = { title: line, subtitle: '', meta: '', desc: [] };
+                        } else {
+                            if (!currentBlock.subtitle) currentBlock.subtitle = line;
+                            else if (!currentBlock.meta) currentBlock.meta = line;
+                            else currentBlock.desc.push(line); 
+                        }
+                    }
+                });
+                if (currentBlock) jobBlocks.push(currentBlock);
+
+                jobBlocks.forEach(job => {
+                    const div = document.createElement('div');
+                    div.className = 'job-item';
+                    
+                    // Logic: Swap subtitle and meta logic? 
+                    // Usually: Title (Role) | Meta (Date)
+                    // Subtitle (Company)
+                    
+                    // Let's assume the parser found:
+                    // Title: Senior Dev
+                    // Subtitle: Tech Solutions
+                    // Meta: 2020 - Present
+                    
+                    // If Meta is missing, check if subtitle looks like a date?
+                    // Simple heuristic: If meta is empty, check subtitle.
+                    let date = job.meta;
+                    let company = job.subtitle;
+                    
+                    // Swap if the date seems to be in the subtitle slot (common in simple text)
+                    if (!date && (company.match(/\d{4}/) || company.toLowerCase().includes('present'))) {
+                         date = company;
+                         company = '';
+                    }
+
+                    div.innerHTML = `
+                        <div class="job-header">
+                            <div class="job-role">${job.title}</div>
+                            <div class="job-date">${date}</div>
+                        </div>
+                        ${company ? `<div class="job-company">${company}</div>` : ''}
+                        ${job.desc.length > 0 ? 
+                            `<div class="job-desc"><ul>${job.desc.map(d => `<li>${d}</li>`).join('')}</ul></div>` 
+                            : ''}
+                    `;
+                    container.appendChild(div);
+                });
+            }
+
+            // Experience & Projects (Main Col)
+            renderMainList(data.experience, els.pExpList, els.secExp);
+            renderMainList(data.projects, els.pProjList, els.secProj);
+            
+            // --- Sidebar Renderers (Edu, Skills, Awards) ---
+            
+            // Education (Special Sidebar Style)
+            // We parse it similarly to jobs but render differently
+            function renderSidebarList(items, container, sectionEl) {
+                container.innerHTML = '';
+                if (!items || items.length === 0) {
+                    sectionEl.classList.add('hidden');
+                    return;
+                }
+                sectionEl.classList.remove('hidden');
+                
+                // Simple grouping: Every non-bullet is a line item, bullets are details
+                // Or just dump them as block items
+                let blocks = [];
+                let cur = null;
+                 items.forEach((line) => {
+                    // Treat every line that's not a bullet as a new entry if previous had bullets, 
+                    // OR if it looks like a degree/school
+                    if(line.startsWith('-')) {
+                        // ignore details for sidebar simplicity? Or append.
+                        // Let's just append simplified text
+                    } else {
+                        // Simple: Create a div for every 2-3 lines? 
+                        // Education is usually: Degree \n School \n Year
+                        blocks.push(line);
+                    }
+                });
+                
+                // New Strategy for Education: Just treat chunks of text as items
+                // We'll create a div for every 3 items roughly, or just list them.
+                // Let's rely on the block parser from before but simpler HTML
+                
+                 let eduBlocks = [];
+                 let currentEdu = null;
+
+                items.forEach((line) => {
+                    if(!currentEdu) currentEdu = { lines: [line] };
+                    else {
+                        // If line has a year, likely end of block?
+                        // If line is empty? (Split removes empties)
+                        // Let's just bundle lines until we hit a likely new degree
+                        // Heuristic: If we have > 2 lines, start new?
+                        if(currentEdu.lines.length >= 3) {
+                            eduBlocks.push(currentEdu);
+                            currentEdu = { lines: [line] };
+                        } else {
+                            currentEdu.lines.push(line);
+                        }
+                    }
+                });
+                if(currentEdu) eduBlocks.push(currentEdu);
+
+                eduBlocks.forEach(block => {
+                    const div = document.createElement('div');
+                    div.className = 'mb-4';
+                    // Line 1: Bold (Degree)
+                    // Line 2: Normal (School)
+                    // Line 3: Italic/Grey (Year)
+                    let html = `<div class="font-bold text-slate-700">${block.lines[0]}</div>`;
+                    if(block.lines[1]) html += `<div class="text-slate-600">${block.lines[1]}</div>`;
+                    if(block.lines[2]) html += `<div class="text-xs text-slate-400 mt-1">${block.lines[2]}</div>`;
+                    div.innerHTML = html;
+                    container.appendChild(div);
+                });
+            }
+            
+            renderSidebarList(data.education, els.pEduList, els.secEdu);
+
+            // Skills
+            els.pSkillsList.innerHTML = '';
+            if (data.skills.length > 0) {
+                els.secSkills.classList.remove('hidden');
+                const rawSkills = data.skills.join(','); 
+                const skillItems = rawSkills.split(/[,|•]/).map(s => s.trim()).filter(s => s);
+                skillItems.forEach(s => {
+                    const tag = document.createElement('span');
+                    tag.className = 'skill-tag';
+                    tag.textContent = s;
+                    els.pSkillsList.appendChild(tag);
+                });
+            } else {
+                els.secSkills.classList.add('hidden');
+            }
+
+            // Awards & Languages (Simple List)
+            function renderSimpleList(items, container, sectionEl) {
+                container.innerHTML = '';
+                if (!items || items.length === 0) {
+                    sectionEl.classList.add('hidden');
+                    return;
+                }
+                sectionEl.classList.remove('hidden');
+                items.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'sidebar-list-item';
+                    div.textContent = item.replace(/^[-•*]\s*/, '');
+                    container.appendChild(div);
+                });
+            }
+            
+            renderSimpleList(data.awards, els.pAwardsList, els.secAwards);
+            renderSimpleList(data.languages, els.pLangList, els.secLang);
+        }
+
+        // --- 6. Event Listeners ---
+
+        els.btnGenerate.addEventListener('click', () => {
+            const text = els.rawInput.value;
+            if(!text.trim()) {
+                alert("Please enter some text!");
+                return;
+            }
+
+            const parsedData = parseText(text);
+            renderCV(parsedData);
+
+            // Switch Views
+            els.inputSection.classList.add('hidden');
+            els.previewSection.classList.remove('hidden');
+            
+            els.btnGenerate.classList.add('hidden');
+            els.btnEdit.classList.remove('hidden');
+            els.btnDownload.classList.remove('hidden');
+        });
+
+        els.btnEdit.addEventListener('click', () => {
+            els.previewSection.classList.add('hidden');
+            els.inputSection.classList.remove('hidden');
+            
+            els.btnEdit.classList.add('hidden');
+            els.btnDownload.classList.add('hidden');
+            els.btnGenerate.classList.remove('hidden');
+        });
+
+        els.btnDownload.addEventListener('click', () => {
+            const element = document.getElementById('cv-preview');
+            const name = els.pName.textContent || 'resume';
+            
+            els.loader.style.display = 'flex';
+
+            const opt = {
+                margin: 0,
+                filename: `${name.replace(/\s+/g, '_').toLowerCase()}_cv.pdf`,
+                image: { type: 'jpeg', quality: 1.0 }, // Max quality
+                html2canvas: { scale: 3, useCORS: true, letterRendering: true }, // Higher scale for crisp text
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            setTimeout(() => {
+                html2pdf().set(opt).from(element).save().then(() => {
+                    els.loader.style.display = 'none';
+                });
+            }, 500); // Increased timeout for rendering stability
+        });
+
+    </script>
+</body>
+</html>
